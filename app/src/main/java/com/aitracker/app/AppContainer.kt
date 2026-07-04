@@ -8,6 +8,10 @@ import com.aitracker.app.data.remote.YahooFinanceApi
 import com.aitracker.app.data.remote.news.NewsApi
 import com.aitracker.app.data.remote.news.NewsApiDataSource
 import com.aitracker.app.data.remote.news.NewsDataSource
+import com.aitracker.app.data.remote.realtime.AutoRealtimeQuoteService
+import com.aitracker.app.data.remote.realtime.FinnhubWebSocketClient
+import com.aitracker.app.data.remote.realtime.RealtimeQuoteService
+import com.aitracker.app.data.remote.realtime.SimulatedRealtimeService
 import com.aitracker.app.data.remote.stock.FinnhubApi
 import com.aitracker.app.data.remote.stock.FinnhubStockDataSource
 import com.aitracker.app.data.remote.stock.StockDataSource
@@ -73,6 +77,18 @@ class AppContainer(context: Context) {
             GoogleNewsService(okHttpClient)
         }
 
+    // --- Real-time feed: real Finnhub WebSocket (with simulated auto-fallback) when a key is set,
+    // otherwise a pure simulated feed so the live ticker is always demonstrable. ---
+    val realtimeQuoteService: RealtimeQuoteService =
+        if (BuildConfig.FINNHUB_API_KEY.isNotBlank()) {
+            AutoRealtimeQuoteService(
+                primary = FinnhubWebSocketClient(okHttpClient, BuildConfig.FINNHUB_API_KEY, gson),
+                fallback = SimulatedRealtimeService(),
+            )
+        } else {
+            SimulatedRealtimeService()
+        }
+
     private val watchlistStore = WatchlistStore(context.applicationContext)
 
     val stockRepository = StockRepository(stockDataSource)
@@ -83,7 +99,8 @@ class AppContainer(context: Context) {
         if (BuildConfig.DEBUG) {
             Log.i(
                 "AppContainer",
-                "Providers — stocks: ${stockDataSource.providerName}, news: ${newsDataSource.providerName}",
+                "Providers — stocks: ${stockDataSource.providerName}, news: ${newsDataSource.providerName}, " +
+                    "realtime: ${realtimeQuoteService.providerName}",
             )
         }
     }

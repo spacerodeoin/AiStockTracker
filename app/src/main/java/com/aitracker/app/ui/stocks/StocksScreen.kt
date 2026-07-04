@@ -23,7 +23,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aitracker.app.data.model.AiCategory
 import com.aitracker.app.ui.AppViewModelProvider
+import com.aitracker.app.data.remote.realtime.ConnectionState
 import com.aitracker.app.ui.components.CompanyRow
+import com.aitracker.app.ui.components.LiveStatusPill
 import com.aitracker.app.ui.components.LoadingState
 import com.aitracker.app.ui.components.MessageState
 import com.aitracker.app.ui.components.ProviderFooter
@@ -48,7 +50,9 @@ fun StocksScreen(
             item {
                 CategoryFilterRow(
                     selected = state.selectedCategory,
+                    connectionState = state.connectionState,
                     onSelect = viewModel::selectCategory,
+                    onTogglePause = viewModel::togglePause,
                     onRefresh = { viewModel.load(isRefresh = true) },
                 )
             }
@@ -79,31 +83,38 @@ fun StocksScreen(
 @Composable
 private fun CategoryFilterRow(
     selected: AiCategory?,
+    connectionState: ConnectionState,
     onSelect: (AiCategory?) -> Unit,
+    onTogglePause: () -> Unit,
     onRefresh: () -> Unit,
 ) {
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        LazyRow(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                FilterChip(
-                    selected = selected == null,
-                    onClick = { onSelect(null) },
-                    label = { Text("All") },
-                )
+    androidx.compose.foundation.layout.Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    FilterChip(
+                        selected = selected == null,
+                        onClick = { onSelect(null) },
+                        label = { Text("All") },
+                    )
+                }
+                items(AiCategory.entries) { category ->
+                    FilterChip(
+                        selected = selected == category,
+                        onClick = { onSelect(category) },
+                        label = { Text(category.label) },
+                    )
+                }
             }
-            items(AiCategory.entries) { category ->
-                FilterChip(
-                    selected = selected == category,
-                    onClick = { onSelect(category) },
-                    label = { Text(category.label) },
-                )
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh prices")
             }
         }
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Refresh prices")
-        }
+        LiveStatusPill(state = connectionState, onToggle = onTogglePause)
     }
 }

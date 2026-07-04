@@ -1,5 +1,8 @@
 package com.aitracker.app.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +44,22 @@ fun CompanyRow(
     onToggleWatch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Briefly tint the row green/red when the live price ticks up/down.
+    val price = item.quote?.price
+    var flashUp by remember { mutableStateOf(true) }
+    var previousPrice by remember { mutableStateOf(price) }
+    val flashAlpha = remember { Animatable(0f) }
+    LaunchedEffect(price) {
+        val prev = previousPrice
+        if (price != null && prev != null && price != prev) {
+            flashUp = price > prev
+            flashAlpha.snapTo(0.22f)
+            flashAlpha.animateTo(0f, animationSpec = tween(durationMillis = 600))
+        }
+        previousPrice = price
+    }
+    val flashColor = (if (flashUp) GreenAccent else RedAccent).copy(alpha = flashAlpha.value)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -46,6 +70,7 @@ fun CompanyRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(flashColor)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

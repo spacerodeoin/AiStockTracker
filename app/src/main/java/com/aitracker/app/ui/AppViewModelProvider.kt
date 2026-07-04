@@ -19,6 +19,7 @@ object AppViewModelProvider {
             StocksViewModel(
                 stockRepository = app().container.stockRepository,
                 watchlistRepository = app().container.watchlistRepository,
+                realtimeQuoteService = app().container.realtimeQuoteService,
             )
         }
         initializer {

@@ -9,6 +9,12 @@ chip makers and AI hardware — alongside recent AI news.
   ASML, Micron, Arm, Microsoft, Alphabet, Amazon, Meta, and more) with live price, daily
   change %, an inline sparkline, and category filters (Hardware, Semiconductors, Cloud,
   AI Models, Software).
+- **Real-time price ticker** — prices stream over a WebSocket and update in place, with each
+  row flashing green/red on a tick. A live status pill (Connecting / Live / Live · Demo /
+  Paused / Offline) shows the connection state; tapping it pauses or resumes the stream. This
+  exercises the WebSocket's two-way nature: the client sends `subscribe`/`unsubscribe` frames
+  upstream (driven by the category filter and the pause/resume toggle) while trade prices flow
+  downstream. See [Real-time feed](#real-time-feed) for provider details.
 - **Company detail** — current price, a 30-day price chart, a description, the company's
   specific AI/hardware focus, and company-specific news headlines.
 - **News tab** — a live feed of recent AI-development headlines.
@@ -22,10 +28,12 @@ chip makers and AI hardware — alongside recent AI news.
 - MVVM with `ViewModel` + `StateFlow`
 - Navigation Compose (bottom navigation + detail route)
 - Retrofit + OkHttp + Gson
+- Real-time quotes over a WebSocket (OkHttp `WebSocket`) exposed as a `SharedFlow` of ticks
 - Jetpack DataStore (watchlist persistence)
 - In-memory TTL quote cache (`QuoteCache`) for price history
 - Manual dependency injection (`AppContainer`)
-- JUnit unit tests (`QuoteCacheTest`)
+- JUnit + kotlinx-coroutines-test unit tests (`QuoteCacheTest`, `FinnhubTradeParserTest`,
+  `SimulatedRealtimeServiceTest`, `ApplyTickTest`)
 
 ## Data sources
 
@@ -40,6 +48,24 @@ keys are configured.
 
 > The free endpoints are public and unofficial — no signup, but they may be rate-limited or
 > change without notice. If prices fail to load, pull to refresh or try again later.
+
+### Real-time feed
+
+The Companies tab streams live prices through a `RealtimeQuoteService` abstraction (built in
+`AppContainer` alongside the REST sources):
+
+| Condition | Feed | Status pill |
+|-----------|------|-------------|
+| `FINNHUB_API_KEY` set **and** trades flowing | **Finnhub WebSocket** (`wss://ws.finnhub.io`) — real trades | Live |
+| No key, or provider silent (e.g. market closed) | **Simulated** feed that jitters the last price every 30s | Live · Demo |
+
+When a key is present, `AutoRealtimeQuoteService` opens the Finnhub socket and, if no real trade
+arrives within a short grace window (or the socket fails), transparently falls back to the
+simulated feed — and switches back if real trades resume. With no key it uses the simulated feed
+directly, so the ticker is always demonstrable.
+
+> The initial prices/history still come from the REST source above; the WebSocket only updates
+> the current price in place.
 
 ### Enabling keyed providers
 
@@ -88,14 +114,15 @@ app/src/main/java/com/aitracker/app/
 │   ├── model/               # Domain models + curated AI company catalog
 │   ├── remote/              # Yahoo Finance API + Google News RSS service
 │   │   ├── stock/           # StockDataSource: Yahoo (free) + Finnhub (keyed)
-│   │   └── news/            # NewsDataSource: Google News (free) + NewsAPI (keyed)
+│   │   ├── news/            # NewsDataSource: Google News (free) + NewsAPI (keyed)
+│   │   └── realtime/        # RealtimeQuoteService: Finnhub WebSocket + simulated fallback
 │   ├── local/               # DataStore watchlist
 │   ├── cache/               # In-memory TTL quote cache (price history)
 │   └── repository/          # Stock / News / Watchlist repositories
 └── ui/
     ├── theme/               # Material 3 theme
     ├── navigation/          # Bottom nav + NavHost
-    ├── components/          # Reusable composables (rows, sparkline, chips)
+    ├── components/          # Reusable composables (rows, sparkline, chips, live status pill)
     ├── stocks/              # Companies tab
     ├── detail/              # Company detail screen
     ├── news/                # News tab
